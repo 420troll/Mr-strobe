@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.21)
+project(TROLLfxHeliosMirror LANGUAGES CXX)
+add_library(helios_mirror SHARED src/proxy.cpp)
+target_compile_features(helios_mirror PRIVATE cxx_std_17)
+target_compile_definitions(helios_mirror PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+set_target_properties(helios_mirror PROPERTIES OUTPUT_NAME "HeliosLaserDAC-x64")
