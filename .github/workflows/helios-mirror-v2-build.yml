@@ -1,0 +1,97 @@
+name: Build Helios Mirror V2
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['feature/helios-etherdream-v2']
+    paths:
+      - 'helios-mirror-v2/**'
+      - '.github/workflows/helios-mirror-v2-build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x64:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S helios-mirror-v2 -B build-v2 -A x64
+
+      - name: Build
+        run: cmake --build build-v2 --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir build-v2 -C Release --output-on-failure
+
+      - name: Verify EtherDream exports and ordinals
+        shell: pwsh
+        run: |
+          $exports = & dumpbin.exe /exports build-v2/Release/EtherDream.dll | Out-String
+          $expected = @(
+            '18 .* EtherDreamCloseDevice',
+            '19 .* EtherDreamGetCardNum',
+            '20 .* EtherDreamGetDeviceName',
+            '21 .* EtherDreamGetStatus',
+            '23 .* EtherDreamOpenDevice',
+            '25 .* EtherDreamStop',
+            '27 .* EtherDreamWriteFrame'
+          )
+          foreach ($pattern in $expected) {
+            if ($exports -notmatch $pattern) { throw "Missing export pattern: $pattern`n$exports" }
+          }
+          $exports | Set-Content build-v2/etherdream-exports.txt
+
+      - name: Fetch pinned runtime dependencies
+        shell: pwsh
+        run: |
+          $heliosCommit = '5881d9f8dd092f18be726cdfd687b9908108d62a'
+          $heliosUrl = "https://raw.githubusercontent.com/Grix/helios_dac/$heliosCommit/sdk/cpp/shared_library/HeliosLaserDAC.dll"
+          Invoke-WebRequest $heliosUrl -OutFile build-v2/HeliosLaserDAC.dll
+          $heliosHash = (Get-FileHash build-v2/HeliosLaserDAC.dll -Algorithm SHA256).Hash.ToLower()
+          if ($heliosHash -ne '903665aab0abb944c71ebb5cced6b22c2751ac40c0df729cebbdb071f49328c2') {
+            throw "Pinned Helios SDK SHA256 mismatch: $heliosHash"
+          }
+          Invoke-WebRequest "https://raw.githubusercontent.com/Grix/helios_dac/$heliosCommit/sdk/cpp/LICENSE.md" -OutFile build-v2/LICENSE-Helios-SDK.md
+
+          $libusbArchive = 'build-v2/libusb-1.0.30.7z'
+          Invoke-WebRequest 'https://github.com/libusb/libusb/releases/download/v1.0.30/libusb-1.0.30.7z' -OutFile $libusbArchive
+          $archiveHash = (Get-FileHash $libusbArchive -Algorithm SHA256).Hash.ToLower()
+          if ($archiveHash -ne '7fb1dfec805b97983763d7d0ae244320da12add1003d4249c96cc4d586398c79') {
+            throw "Pinned libusb archive SHA256 mismatch: $archiveHash"
+          }
+          & 7z.exe x $libusbArchive "-obuild-v2/libusb" -y | Out-Null
+          $libusb = Get-ChildItem build-v2/libusb -Recurse -Filter libusb-1.0.dll |
+            Where-Object { $_.FullName -match 'MS64|x64' } | Select-Object -First 1
+          if (-not $libusb) { throw 'x64 libusb-1.0.dll not found in official archive' }
+          Copy-Item $libusb.FullName build-v2/libusb-1.0.dll
+          Invoke-WebRequest 'https://raw.githubusercontent.com/libusb/libusb/v1.0.30/COPYING' -OutFile build-v2/LICENSE-libusb.txt
+
+      - name: Stage portable ZIP
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/scripts, dist/docs | Out-Null
+          Copy-Item build-v2/Release/EtherDream.dll dist/
+          Copy-Item build-v2/Release/TROLLfx-Helios-Mirror-V2.exe dist/
+          Copy-Item build-v2/HeliosLaserDAC.dll, build-v2/libusb-1.0.dll dist/
+          Copy-Item build-v2/LICENSE-Helios-SDK.md, build-v2/LICENSE-libusb.txt dist/
+          Copy-Item helios-mirror-v2/mirror.ini, helios-mirror-v2/README.md dist/
+          Copy-Item helios-mirror-v2/scripts/*.ps1 dist/scripts/
+          Copy-Item helios-mirror-v2/docs/* dist/docs/
+          Get-ChildItem dist -Recurse -File | Sort-Object FullName | ForEach-Object {
+            $relative = [IO.Path]::GetRelativePath((Resolve-Path dist), $_.FullName)
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $relative"
+          } | Set-Content dist/SHA256SUMS.txt
+          Compress-Archive -Path dist/* -DestinationPath TROLLfx-Helios-Mirror-V2-win64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TROLLfx-Helios-Mirror-V2-windows-x64
+          path: |
+            TROLLfx-Helios-Mirror-V2-win64.zip
+            build-v2/etherdream-exports.txt
+          if-no-files-found: error

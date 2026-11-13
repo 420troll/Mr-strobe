@@ -1,0 +1,9 @@
+LIBRARY EtherDream
+EXPORTS
+    EtherDreamCloseDevice   @18
+    EtherDreamGetCardNum    @19
+    EtherDreamGetDeviceName @20
+    EtherDreamGetStatus     @21
+    EtherDreamOpenDevice    @23
+    EtherDreamStop          @25
+    EtherDreamWriteFrame    @27
