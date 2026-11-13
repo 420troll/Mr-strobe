@@ -1,0 +1,28 @@
+name: Build Helios Mirror
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'helios-mirror/**'
+      - '.github/workflows/helios-mirror-build.yml'
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S helios-mirror -B build -A x64
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Stage
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item build/Release/HeliosLaserDAC-x64.dll dist/
+          Copy-Item helios-mirror/mirror.ini dist/
+          Copy-Item helios-mirror/mirror_control.py dist/
+          Copy-Item helios-mirror/README.md dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: helios-mirror-windows
+          path: dist/
