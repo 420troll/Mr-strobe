@@ -164,7 +164,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int show) {
     WNDCLASSW wc{};
     wc.lpfnWndProc = window_proc;
     wc.hInstance = instance;
-    wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+    wc.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
     wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
     wc.lpszClassName = L"TrollfxHeliosMirrorV2Controller";
     RegisterClassW(&wc);

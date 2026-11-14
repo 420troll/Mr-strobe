@@ -46,6 +46,7 @@ if(BUILD_TESTING)
 
         add_executable(etherdream_abi_smoke tests/abi_smoke.cpp)
         target_include_directories(etherdream_abi_smoke PRIVATE include)
+        target_compile_features(etherdream_abi_smoke PRIVATE cxx_std_17)
         set_target_properties(etherdream_abi_smoke PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY "$<TARGET_FILE_DIR:etherdream_bridge>/abi")
         add_custom_command(TARGET etherdream_abi_smoke POST_BUILD

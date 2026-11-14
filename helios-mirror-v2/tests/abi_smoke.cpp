@@ -4,7 +4,6 @@
 #include <windows.h>
 
 #include <cstdint>
-#include <filesystem>
 #include <iostream>
 
 namespace {
