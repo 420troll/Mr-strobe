@@ -30,7 +30,12 @@ jobs:
       - name: Verify EtherDream exports and ordinals
         shell: pwsh
         run: |
-          $exports = & dumpbin.exe /exports build-v2/Release/EtherDream.dll | Out-String
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $installation = & $vswhere -latest -property installationPath
+          $dumpbin = Get-ChildItem "$installation\VC\Tools\MSVC" -Recurse -Filter dumpbin.exe |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $dumpbin) { throw 'dumpbin.exe not found in the Visual Studio installation' }
+          $exports = & $dumpbin.FullName /exports build-v2/Release/EtherDream.dll | Out-String
           $expected = @(
             '18 .* EtherDreamCloseDevice',
             '19 .* EtherDreamGetCardNum',
